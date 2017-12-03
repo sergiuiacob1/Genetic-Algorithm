@@ -1,10 +1,13 @@
+// #pragma comment(linker, "/STACK:514572800")
+// #pragma comment(linker, "/HEAP:714572800")
+
 #include <iostream>
 #include <vector>
 #include <ctime>
 #include <cmath>
 #include <algorithm>
 #include <cstdlib>
-#define DMAX 5000
+#define DMAX 1100
 #define P_MUTATION 0.01
 #define P_CROSS 0.25
 #define INF 2000000000
@@ -53,13 +56,11 @@ int main() {
 
 	srand((unsigned int)time(NULL));
 
-	nrDims = 2; discreteFactor = 2;
+	nrDims = 30; discreteFactor = 2;
 	for (int i = 0; i < nrDims; ++i) {
 		acceptedVals[i][0] = -5.12;
 		acceptedVals[i][1] = 5.12;
 	}
-	acceptedVals[0][0] = -5.12; acceptedVals[0][1] = 5.12;
-	acceptedVals[1][0] = -5.12; acceptedVals[1][1] = 5.12;
 	for (int i = 0; i < nrDims; ++i)
 		BuildLgReprez(i, acceptedVals[i], discreteFactor);
 	fRez = GeneticAlgorithm(Rastrigin, nrDims, acceptedVals);
@@ -72,19 +73,21 @@ int main() {
 
 void BuildLgReprez(int pos, double acceptedVals[2], int discreteFactor) {
 	int lg;
-	for (lg = 0; (acceptedVals[1] - acceptedVals[0]) * pow(10, discreteFactor) > pow(2, lg);)
+	for (lg = 0; (acceptedVals[1] - acceptedVals[0]) * pow(10, discreteFactor) > pow(2, lg) - 1;)
 		++lg;
 
 	lgReprez[pos] = lg;
 }
 
+
+bool chromosomes[DMAX][DMAX * sizeof(int)];
+
 double GeneticAlgorithm(double(*testFunction)(double[], int), int nrDims, double acceptedVals[][2]) {
 	double bestSol, generationResult;
 	int nrIterations, popSize, currentGeneration, lastBestGeneration;
-	bool chromosomes[DMAX][DMAX * sizeof(int)];
 
-	nrIterations = 100;
-	popSize = 1000;
+	nrIterations = 10;
+	popSize = 100;
 	bestSol = INF;
 	for (int i = 0; i < nrIterations; ++i) {
 		GenerateRandomSolution(chromosomes, popSize, nrDims, acceptedVals);
@@ -109,6 +112,12 @@ double GeneticAlgorithm(double(*testFunction)(double[], int), int nrDims, double
 	}
 
 	return bestSol;
+}
+
+bool PopulationIsEvoluating(int lastBestGeneration, int currentGeneration) {
+	if (currentGeneration - lastBestGeneration > 50)
+		return false;
+	return true;
 }
 
 double EvaluatePopulation(bool chromosomes[][DMAX * sizeof(int)], int popSize, int nrDims, double(*testFunction)(double[], int), double acceptedVals[][2]) {
@@ -146,9 +155,10 @@ void BuildPartialProbabilities(double sumFitness, double chromosomeFitness[], in
 	for (int i = 0; i < popSize; ++i)
 		prob[i] = chromosomeFitness[i] / sumFitness;
 
-	probCumulated[0] = prob[0];
+	probCumulated[0] = 0;
 	for (int i = 1; i < popSize; ++i)
 		probCumulated[i] = probCumulated[i - 1] + prob[i];
+	probCumulated[popSize + 1] = 1.1;
 }
 
 void ValsToDouble(double doubleVals[], bool chromosome[], int nrDims, double acceptedVals[][2]) {
@@ -176,31 +186,26 @@ void CreateRandomChromosome(bool chromosome[], int nrDims) {
 	}
 }
 
-bool PopulationIsEvoluating(int lastBestGeneration, int currentGeneration) {
-	if (currentGeneration - lastBestGeneration > 100)
-		return false;
-	return true;
-}
-
+bool auxChromosomes[DMAX][DMAX * sizeof(int)];
 void SelectNextPopulation(bool chromosomes[][DMAX * sizeof(int)], int &popSize, int nrDims) {
 	double randomNr;
-	bool chosen[DMAX];
+	int chosen[DMAX];
 	memset(chosen, 0, sizeof(chosen));
 
-	randomNr = RandomDouble(0, 1);
-	if (randomNr <= prob[0]) chosen[0] = true;
-
-	for (int i = 1; i < popSize; ++i) {
+	for (int i = 0; i < popSize; ++i) {
 		randomNr = RandomDouble(0, 1);
-		if (probCumulated[i - 1] < randomNr && randomNr <= probCumulated[i])
-			chosen[i] = true;
+		for (int j = 0; j < popSize; ++j)
+			if (probCumulated[j] < randomNr && randomNr <= probCumulated[j + 1])
+				chosen[i] = j;
 	}
+
+	for (int i = 0; i < popSize; ++i)
+		Copy(auxChromosomes[i], chromosomes[i], DMAX * sizeof(int));
 
 	int i, aux = popSize;
 	popSize = 0;
 	for (i = 0; i < aux; ++i)
-		if (chosen[i])
-			Copy(chromosomes[popSize++], chromosomes[i], DMAX * sizeof(int));
+			Copy(chromosomes[popSize++], auxChromosomes[chosen[i]], DMAX * sizeof(int));
 }
 
 void MutateChromosomes(bool chromosomes[][DMAX * sizeof(int)], int popSize, int nrDims) {
@@ -213,7 +218,7 @@ void MutateChromosomes(bool chromosomes[][DMAX * sizeof(int)], int popSize, int 
 	for (int i = 0; i < popSize; ++i)
 		for (int j = 0; j < sumLgReprez; ++j) {
 			randomNr = RandomDouble(0, 1);
-			if (randomNr <= P_MUTATION)
+			if (randomNr < P_MUTATION)
 				chromosomes[i][j] = 1 - chromosomes[i][j];
 		}
 }
@@ -224,7 +229,7 @@ void CrossChromosomes(bool chromosomes[][DMAX * sizeof(int)], int popSize, int n
 
 	for (int i = 0; i < popSize; ++i) {
 		randomNr = RandomDouble(0, 1);
-		if (randomNr <= P_CROSS)
+		if (randomNr < P_CROSS)
 			chosenForCrossing.push_back(i);
 	}
 
