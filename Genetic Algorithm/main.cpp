@@ -4,7 +4,7 @@
 #include <cmath>
 #include <algorithm>
 #include <cstdlib>
-#define DMAX 100
+#define DMAX 5000
 #define P_MUTATION 0.01
 #define P_CROSS 0.25
 #define INF 2000000000
@@ -14,33 +14,37 @@
 
 using namespace std;
 
+struct pack {
+	double fitness, functionValue;
+};
+
 double prob[DMAX], probCumulated[DMAX];
 int lgReprez[DMAX];
 int discreteFactor;
 
-void CrossChromosomes(bool chromosomes[DMAX][DMAX * sizeof(int)], int popSize, int nrDims);
-void CrossIndividualChromosomes(bool[][DMAX * sizeof(int)], int, int, int);
 double DeJong(double[], int);
 double SixHump(double[], int);
 double Schwefel7(double[], int);
 double Rastrigin(double[], int);
 
-void BuildLgReprez(int, double[], int);
+void BuildLgReprez(int, double[2], int);
 double GeneticAlgorithm(double(*)(double[], int), int, double[][2]);
 double RandomDouble(const double &, const double &);
 int BinaryToInt(bool[], int);
 void Copy(double[], double[], int);
 void Copy(bool[], bool[], int);
-void ValsToDouble(double[], bool[], int, double[]);
+void ValsToDouble(double[], bool[], int, double[][2]);
 void BuildPartialProbabilities(double, double[], int);
-double Fitness(double(*testFunction)(double[], int), double[], int);
+struct pack Fitness(double(*testFunction)(double[], int), double[], int);
 void GenerateRandomSolution(bool[][DMAX * sizeof(int)], int, int, double[][2]);
 void CreateRandomChromosome(bool[], int);
 bool PopulationIsEvoluating(int, int);
 double EvaluatePopulation(bool[][DMAX * sizeof(int)], int, int, double(*testFunction)(double[], int), double[][2]);
 void SelectNextPopulation(bool[][DMAX * sizeof(int)], int &, int);
 void MutateChromosomes(bool[][DMAX * sizeof(int)], int, int);
+
 void CrossChromosomes(bool[][DMAX * sizeof(int)], int, int);
+void CrossIndividualChromosomes(bool[][DMAX * sizeof(int)], int, int, int);
 
 int main() {
 	double fRez;
@@ -50,6 +54,10 @@ int main() {
 	srand((unsigned int)time(NULL));
 
 	nrDims = 2; discreteFactor = 2;
+	for (int i = 0; i < nrDims; ++i) {
+		acceptedVals[i][0] = -5.12;
+		acceptedVals[i][1] = 5.12;
+	}
 	acceptedVals[0][0] = -5.12; acceptedVals[0][1] = 5.12;
 	acceptedVals[1][0] = -5.12; acceptedVals[1][1] = 5.12;
 	for (int i = 0; i < nrDims; ++i)
@@ -64,7 +72,7 @@ int main() {
 
 void BuildLgReprez(int pos, double acceptedVals[2], int discreteFactor) {
 	int lg;
-	for (lg = 0; (acceptedVals[1] - acceptedVals[0]) * pow(10, discreteFactor) > pow(2, lg) - 1;)
+	for (lg = 0; (acceptedVals[1] - acceptedVals[0]) * pow(10, discreteFactor) > pow(2, lg);)
 		++lg;
 
 	lgReprez[pos] = lg;
@@ -76,7 +84,7 @@ double GeneticAlgorithm(double(*testFunction)(double[], int), int nrDims, double
 	bool chromosomes[DMAX][DMAX * sizeof(int)];
 
 	nrIterations = 100;
-	popSize = 100;
+	popSize = 1000;
 	bestSol = INF;
 	for (int i = 0; i < nrIterations; ++i) {
 		GenerateRandomSolution(chromosomes, popSize, nrDims, acceptedVals);
@@ -95,21 +103,25 @@ double GeneticAlgorithm(double(*testFunction)(double[], int), int nrDims, double
 			CrossChromosomes(chromosomes, popSize, nrDims);
 
 			++currentGeneration;
+
+			//cout << "Current Best solution: " << bestSol << '\n';
 		}
 	}
 
 	return bestSol;
 }
 
-double EvaluatePopulation(bool chromosomes[DMAX][DMAX * sizeof(int)], int popSize, int nrDims, double(*testFunction)(double[], int), double acceptedVals[][2]) {
+double EvaluatePopulation(bool chromosomes[][DMAX * sizeof(int)], int popSize, int nrDims, double(*testFunction)(double[], int), double acceptedVals[][2]) {
 	double chromosomeFitness[DMAX], doubleVals[DMAX];
 	double bestSol = INF, sumFitness = 0;
+	struct pack result;
 
 	for (int i = 0; i < popSize; ++i) {
-		ValsToDouble(doubleVals, chromosomes[i], nrDims, acceptedVals[i]);
+		ValsToDouble(doubleVals, chromosomes[i], nrDims, acceptedVals);
 
-		chromosomeFitness[i] = Fitness(testFunction, doubleVals, nrDims);
-		bestSol = min(bestSol, chromosomeFitness[i]);
+		result = Fitness(testFunction, doubleVals, nrDims);
+		chromosomeFitness[i] = result.fitness;
+		bestSol = min(bestSol, result.functionValue);
 		sumFitness += chromosomeFitness[i];
 	}
 
@@ -118,14 +130,19 @@ double EvaluatePopulation(bool chromosomes[DMAX][DMAX * sizeof(int)], int popSiz
 	return bestSol;
 }
 
-double Fitness(double(*testFunction)(double[], int), double doubleVals[], int nrDims) {
-	if (testFunction == &Schwefel7)
-		return abs(Schwefel7(doubleVals, nrDims) + C);
+struct pack Fitness(double(*testFunction)(double[], int), double doubleVals[], int nrDims) {
+	struct pack rez;
 
-	return 1 / (testFunction(doubleVals, nrDims) + EPSILON);
+	rez.functionValue = testFunction(doubleVals, nrDims);
+
+	if (testFunction == &Schwefel7)
+		rez.fitness = abs(rez.functionValue + C);
+	else
+		rez.fitness = (1 / (rez.functionValue + EPSILON));
+	return rez;
 }
 
-void BuildPartialProbabilities(double sumFitness, double chromosomeFitness[DMAX], int popSize) {
+void BuildPartialProbabilities(double sumFitness, double chromosomeFitness[], int popSize) {
 	for (int i = 0; i < popSize; ++i)
 		prob[i] = chromosomeFitness[i] / sumFitness;
 
@@ -134,17 +151,17 @@ void BuildPartialProbabilities(double sumFitness, double chromosomeFitness[DMAX]
 		probCumulated[i] = probCumulated[i - 1] + prob[i];
 }
 
-void ValsToDouble(double doubleVals[DMAX], bool chromosome[DMAX * sizeof(int)], int nrDims, double acceptedVals[]) {
+void ValsToDouble(double doubleVals[], bool chromosome[], int nrDims, double acceptedVals[][2]) {
 	int aux, sumLgReprez = 0;
 	for (int i = 0; i < nrDims; ++i) {
 		aux = BinaryToInt(chromosome + sumLgReprez, lgReprez[i]);
-		doubleVals[i] = acceptedVals[0] + aux + (acceptedVals[1] - acceptedVals[0]) / (pow(2, lgReprez[i]) - 1);
+		doubleVals[i] = acceptedVals[i][0] + aux * (acceptedVals[i][1] - acceptedVals[i][0]) / (pow(2, lgReprez[i]) - 1);
 
 		sumLgReprez += lgReprez[i];
 	}
 }
 
-void GenerateRandomSolution(bool chromosomes[DMAX][DMAX * sizeof(int)], int popSize, int nrDims, double acceptedVals[DMAX][2]) {
+void GenerateRandomSolution(bool chromosomes[][DMAX * sizeof(int)], int popSize, int nrDims, double acceptedVals[][2]) {
 	for (int i = 0; i < popSize; ++i) {
 		CreateRandomChromosome(chromosomes[i], nrDims);
 	}
@@ -186,7 +203,7 @@ void SelectNextPopulation(bool chromosomes[][DMAX * sizeof(int)], int &popSize, 
 			Copy(chromosomes[popSize++], chromosomes[i], DMAX * sizeof(int));
 }
 
-void MutateChromosomes(bool chromosomes[DMAX][DMAX * sizeof(int)], int popSize, int nrDims) {
+void MutateChromosomes(bool chromosomes[][DMAX * sizeof(int)], int popSize, int nrDims) {
 	int sumLgReprez = 0;
 	double randomNr;
 
@@ -201,7 +218,7 @@ void MutateChromosomes(bool chromosomes[DMAX][DMAX * sizeof(int)], int popSize, 
 		}
 }
 
-void CrossChromosomes(bool chromosomes[DMAX][DMAX * sizeof(int)], int popSize, int nrDims) {
+void CrossChromosomes(bool chromosomes[][DMAX * sizeof(int)], int popSize, int nrDims) {
 	vector <int> chosenForCrossing;
 	double randomNr;
 
@@ -210,6 +227,9 @@ void CrossChromosomes(bool chromosomes[DMAX][DMAX * sizeof(int)], int popSize, i
 		if (randomNr <= P_CROSS)
 			chosenForCrossing.push_back(i);
 	}
+
+	if (chosenForCrossing.size() % 2)
+		chosenForCrossing.pop_back();
 
 	for (unsigned int i = 0; i < chosenForCrossing.size(); i += 2) {
 		CrossIndividualChromosomes(chromosomes, nrDims, chosenForCrossing[i], chosenForCrossing[i + 1]);
