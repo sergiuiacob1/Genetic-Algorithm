@@ -64,7 +64,7 @@ int main() {
 	for (int i = 0; i < nrDims; ++i)
 		BuildLgReprez(i, acceptedVals[i], discreteFactor);
 	fRez = GeneticAlgorithm(Rastrigin, nrDims, acceptedVals);
-	cout << "Rastrigin: " << fRez << '\n';
+	cout << "Function min: " << fRez << '\n';
 
 	cin >> fRez;//sa apara consola
 
@@ -86,8 +86,8 @@ double GeneticAlgorithm(double(*testFunction)(double[], int), int nrDims, double
 	double bestSol, generationResult;
 	int nrIterations, popSize, currentGeneration, lastBestGeneration;
 
-	nrIterations = 10;
-	popSize = 100;
+	nrIterations = 1;
+	popSize = 1000;
 	bestSol = INF;
 	for (int i = 0; i < nrIterations; ++i) {
 		GenerateRandomSolution(chromosomes, popSize, nrDims, acceptedVals);
@@ -107,7 +107,7 @@ double GeneticAlgorithm(double(*testFunction)(double[], int), int nrDims, double
 
 			++currentGeneration;
 
-			//cout << "Current Best solution: " << bestSol << '\n';
+			cout << "Current Best solution: " << bestSol << '\n';
 		}
 	}
 
@@ -115,7 +115,7 @@ double GeneticAlgorithm(double(*testFunction)(double[], int), int nrDims, double
 }
 
 bool PopulationIsEvoluating(int lastBestGeneration, int currentGeneration) {
-	if (currentGeneration - lastBestGeneration > 50)
+	if (currentGeneration - lastBestGeneration >= 100)
 		return false;
 	return true;
 }
@@ -157,8 +157,8 @@ void BuildPartialProbabilities(double sumFitness, double chromosomeFitness[], in
 
 	probCumulated[0] = 0;
 	for (int i = 1; i < popSize; ++i)
-		probCumulated[i] = probCumulated[i - 1] + prob[i];
-	probCumulated[popSize + 1] = 1.1;
+		probCumulated[i] = probCumulated[i - 1] + prob[i-1];
+	probCumulated[popSize] = 1.1;
 }
 
 void ValsToDouble(double doubleVals[], bool chromosome[], int nrDims, double acceptedVals[][2]) {
