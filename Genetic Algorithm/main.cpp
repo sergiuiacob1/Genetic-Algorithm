@@ -7,7 +7,7 @@
 #include <cmath>
 #include <algorithm>
 #include <cstdlib>
-#define DMAX 2010
+#define DMAX 5010
 #define P_MUTATION 0.0075
 #define P_CROSS 0.25
 #define INF 2000000000
@@ -25,6 +25,8 @@ double prob[DMAX], probCumulated[DMAX];
 int lgReprez[DMAX], sumLgReprez;
 int discreteFactor;
 bool chromosomeWillBeCrossed[DMAX];
+
+void RunFunction(int);
 
 double DeJong(double[], int);
 double SixHump(double[], int);
@@ -51,32 +53,21 @@ void CrossChromosomes(bool[][DMAX * sizeof(int)], int, int);
 void CrossIndividualChromosomes(bool[][DMAX * sizeof(int)], int, int, int);
 
 int main() {
-	double fRez;
-	double acceptedVals[DMAX][2];
-	int nrDims, discreteFactor;
-
+	int aux;
 	srand((unsigned int)time(NULL));
 
-	nrDims = 30; discreteFactor = 6;
-	for (int i = 0; i < nrDims; ++i) {
-		acceptedVals[i][0] = -5.12;
-		acceptedVals[i][1] = 5.12;
-	}
-	for (int i = 0; i < nrDims; ++i) {
-		BuildLgReprez(i, acceptedVals[i], discreteFactor);
-		sumLgReprez += lgReprez[i];
-	}
-	fRez = GeneticAlgorithm(Rastrigin, nrDims, acceptedVals);
-	cout << "Function min: " << fRez << '\n';
+	cout << "0 - DeJong, 1 - Rastrigin, 2 - Schwefel, 3 - SixHump\n";
+	cin >> aux;
+	RunFunction(aux);
 
-	cin >> fRez;//sa apara consola
+	cin >> aux;//sa apara consola
 
 	return 0;
 }
 
 void BuildLgReprez(int pos, double acceptedVals[2], int discreteFactor) {
 	int lg;
-	for (lg = 0; (acceptedVals[1] - acceptedVals[0]) * pow(10, discreteFactor) > pow(2, lg) - 1;)
+	for (lg = 0; (acceptedVals[1] - acceptedVals[0]) * pow(10, discreteFactor) > pow(2, lg);)
 		++lg;
 
 	lgReprez[pos] = lg;
@@ -90,7 +81,7 @@ double GeneticAlgorithm(double(*testFunction)(double[], int), int nrDims, double
 	int nrIterations, popSize, currentGeneration, lastBestGeneration;
 
 	nrIterations = 1;
-	popSize = 1000;
+	popSize = 4000;
 	bestSol = INF;
 	for (int i = 0; i < nrIterations; ++i) {
 		GenerateRandomSolution(chromosomes, popSize, nrDims, acceptedVals);
@@ -103,6 +94,9 @@ double GeneticAlgorithm(double(*testFunction)(double[], int), int nrDims, double
 				bestSol = generationResult;
 				lastBestGeneration = currentGeneration;
 				cout << "Current Best solution: " << bestSol << '\n';
+				if (bestSol <= 3.5) {
+					cout << "salz\n";
+				}
 			}
 
 			SelectNextPopulation(chromosomes, popSize, nrDims);
@@ -117,7 +111,7 @@ double GeneticAlgorithm(double(*testFunction)(double[], int), int nrDims, double
 }
 
 bool PopulationIsEvoluating(int lastBestGeneration, int currentGeneration) {
-	if (currentGeneration - lastBestGeneration >= 500)
+	if (currentGeneration - lastBestGeneration >= 1000)
 		return false;
 	return true;
 }
@@ -211,11 +205,7 @@ void SelectNextPopulation(bool chromosomes[][DMAX * sizeof(int)], int &popSize, 
 }
 
 void MutateChromosomes(bool chromosomes[][DMAX * sizeof(int)], int popSize, int nrDims) {
-	int sumLgReprez = 0;
 	double randomNr;
-
-	for (int i = 0; i < nrDims; ++i)
-		sumLgReprez += lgReprez[i];
 
 	for (int i = 0; i < popSize; ++i) {
 		if (chromosomeWillBeCrossed[i]) continue;
@@ -254,7 +244,7 @@ void CrossChromosomes(bool chromosomes[][DMAX * sizeof(int)], int popSize, int n
 void CrossIndividualChromosomes(bool chromosomes[][DMAX * sizeof(int)], int nrDims, int pos1, int pos2) {
 	int randomPoz, sumLgReprez = 0;
 	for (int i = 0; i < nrDims; ++i)
-		sumLgReprez += lgReprez[i];
+		sumLgReprez += lgReprez[i];//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 	randomPoz = rand() % sumLgReprez;
 	for (int j = randomPoz; j < sumLgReprez; ++j)
@@ -343,4 +333,52 @@ double RandomDouble(const double &minVal, const double &maxVal) {
 	double f;
 	f = (double)rand() / RAND_MAX;
 	return minVal + f * (maxVal - minVal);
+}
+
+void RunFunction(int function) {
+	double fRez;
+	double acceptedVals[DMAX][2];
+	int nrDims, discreteFactor;
+
+	nrDims = 30; discreteFactor = 6;
+
+	if (function <= 1)
+		for (int i = 0; i < nrDims; ++i) {
+			acceptedVals[i][0] = -5.12;
+			acceptedVals[i][1] = 5.12;
+		}
+
+	if (function == 2) {
+		for (int i = 0; i < nrDims; ++i) {
+			acceptedVals[i][0] = -500;
+			acceptedVals[i][1] = 500;
+		}
+	}
+	if (function == 3) {
+		nrDims = 2;
+		acceptedVals[0][0] = -3; acceptedVals[0][1] = 3;
+		acceptedVals[1][0] = -2; acceptedVals[1][1] = 2;
+	}
+
+	for (int i = 0; i < nrDims; ++i) {
+		BuildLgReprez(i, acceptedVals[i], discreteFactor);
+		sumLgReprez += lgReprez[i];
+	}
+
+	switch (function) {
+	case 0:
+		fRez = GeneticAlgorithm(DeJong, nrDims, acceptedVals);
+		break;
+	case 1:
+		fRez = GeneticAlgorithm(Rastrigin, nrDims, acceptedVals);
+		break;
+	case 2:
+		fRez = GeneticAlgorithm(Schwefel7, nrDims, acceptedVals);
+		break;
+	case 3:
+		fRez = GeneticAlgorithm(SixHump, 2, acceptedVals);
+		break;
+	}
+	
+	cout << "Function min: " << fRez << '\n';
 }
