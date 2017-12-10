@@ -67,7 +67,7 @@ int main() {
 
 void BuildLgReprez(int pos, double acceptedVals[2], int discreteFactor) {
 	int lg;
-	for (lg = 0; (acceptedVals[1] - acceptedVals[0]) * pow(10, discreteFactor) > pow(2, lg);)
+	for (lg = 0; (acceptedVals[1] - acceptedVals[0]) * pow(10, discreteFactor) > pow(2, lg) - 1;)
 		++lg;
 
 	lgReprez[pos] = lg;
@@ -81,7 +81,7 @@ double GeneticAlgorithm(double(*testFunction)(double[], int), int nrDims, double
 	int nrIterations, popSize, currentGeneration, lastBestGeneration;
 
 	nrIterations = 1;
-	popSize = 4000;
+	popSize = 1500;
 	bestSol = INF;
 	for (int i = 0; i < nrIterations; ++i) {
 		GenerateRandomSolution(chromosomes, popSize, nrDims, acceptedVals);
@@ -94,9 +94,6 @@ double GeneticAlgorithm(double(*testFunction)(double[], int), int nrDims, double
 				bestSol = generationResult;
 				lastBestGeneration = currentGeneration;
 				cout << "Current Best solution: " << bestSol << '\n';
-				if (bestSol <= 3.5) {
-					cout << "salz\n";
-				}
 			}
 
 			SelectNextPopulation(chromosomes, popSize, nrDims);
@@ -111,7 +108,7 @@ double GeneticAlgorithm(double(*testFunction)(double[], int), int nrDims, double
 }
 
 bool PopulationIsEvoluating(int lastBestGeneration, int currentGeneration) {
-	if (currentGeneration - lastBestGeneration >= 1000)
+	if (currentGeneration - lastBestGeneration >= 50)
 		return false;
 	return true;
 }
@@ -141,7 +138,7 @@ struct pack Fitness(double(*testFunction)(double[], int), double doubleVals[], i
 	rez.functionValue = testFunction(doubleVals, nrDims);
 
 	if (testFunction == &Schwefel7)
-		rez.fitness = abs(rez.functionValue + C);
+		rez.fitness = abs(1 / (rez.functionValue + C));
 	else
 		rez.fitness = (1 / (rez.functionValue + EPSILON));
 	return rez;
@@ -153,7 +150,7 @@ void BuildPartialProbabilities(double sumFitness, double chromosomeFitness[], in
 
 	probCumulated[0] = 0;
 	for (int i = 1; i < popSize; ++i)
-		probCumulated[i] = probCumulated[i - 1] + prob[i-1];
+		probCumulated[i] = probCumulated[i - 1] + prob[i - 1];
 	probCumulated[popSize] = 1.1;
 }
 
@@ -201,7 +198,7 @@ void SelectNextPopulation(bool chromosomes[][DMAX * sizeof(int)], int &popSize, 
 	int i, aux = popSize;
 	popSize = 0;
 	for (i = 0; i < aux; ++i)
-			Copy(chromosomes[popSize++], auxChromosomes[chosen[i]], sumLgReprez);
+		Copy(chromosomes[popSize++], auxChromosomes[chosen[i]], sumLgReprez);
 }
 
 void MutateChromosomes(bool chromosomes[][DMAX * sizeof(int)], int popSize, int nrDims) {
@@ -242,9 +239,7 @@ void CrossChromosomes(bool chromosomes[][DMAX * sizeof(int)], int popSize, int n
 }
 
 void CrossIndividualChromosomes(bool chromosomes[][DMAX * sizeof(int)], int nrDims, int pos1, int pos2) {
-	int randomPoz, sumLgReprez = 0;
-	for (int i = 0; i < nrDims; ++i)
-		sumLgReprez += lgReprez[i];//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	int randomPoz;
 
 	randomPoz = rand() % sumLgReprez;
 	for (int j = randomPoz; j < sumLgReprez; ++j)
@@ -337,18 +332,21 @@ double RandomDouble(const double &minVal, const double &maxVal) {
 
 void RunFunction(int function) {
 	double fRez;
+	double fRezMin = INF, fRezMax = -INF, fRezMed, sum = 0;
 	double acceptedVals[DMAX][2];
 	int nrDims, discreteFactor;
 
-	nrDims = 30; discreteFactor = 6;
+	nrDims = 5; discreteFactor = 8;
 
 	if (function <= 1)
-		for (int i = 0; i < nrDims; ++i) {
-			acceptedVals[i][0] = -5.12;
-			acceptedVals[i][1] = 5.12;
-		}
+		discreteFactor = 2;
+	for (int i = 0; i < nrDims; ++i) {
+		acceptedVals[i][0] = -5.12;
+		acceptedVals[i][1] = 5.12;
+	}
 
 	if (function == 2) {
+		discreteFactor = 6;
 		for (int i = 0; i < nrDims; ++i) {
 			acceptedVals[i][0] = -500;
 			acceptedVals[i][1] = 500;
@@ -367,18 +365,47 @@ void RunFunction(int function) {
 
 	switch (function) {
 	case 0:
-		fRez = GeneticAlgorithm(DeJong, nrDims, acceptedVals);
+		for (int i = 0; i < 15; ++i) {
+			fRez = GeneticAlgorithm(DeJong, nrDims, acceptedVals);
+			sum += fRez;
+			fRezMin = min(fRez, fRezMin);
+			fRezMax = max(fRez, fRezMax);
+		}
+		fRezMed = sum / 15;
+
+		cout << "De Jong, " << nrDims << " dimensions: ";
 		break;
 	case 1:
-		fRez = GeneticAlgorithm(Rastrigin, nrDims, acceptedVals);
+		for (int i = 0; i < 15; ++i) {
+			fRez = GeneticAlgorithm(Rastrigin, nrDims, acceptedVals);
+			sum += fRez;
+			fRezMin = min(fRez, fRezMin);
+			fRezMax = max(fRez, fRezMax);
+		}
+		fRezMed = sum / 15;
+		cout << "Rastrigin, " << nrDims << " dimensions: ";
 		break;
 	case 2:
-		fRez = GeneticAlgorithm(Schwefel7, nrDims, acceptedVals);
+		for (int i = 0; i < 15; ++i) {
+			fRez = GeneticAlgorithm(Schwefel7, nrDims, acceptedVals);
+			sum += fRez;
+			fRezMin = min(fRez, fRezMin);
+			fRezMax = max(fRez, fRezMax);
+		}
+		fRezMed = sum / 15;
+		cout << "Schwefel7, " << nrDims << " dimensions: ";
 		break;
 	case 3:
-		fRez = GeneticAlgorithm(SixHump, 2, acceptedVals);
+		for (int i = 0; i < 15; ++i) {
+			fRez = GeneticAlgorithm(SixHump, nrDims, acceptedVals);
+			sum += fRez;
+			fRezMin = min(fRez, fRezMin);
+			fRezMax = max(fRez, fRezMax);
+		}
+		fRezMed = sum / 15;
+		cout << "Six Hump, " << nrDims << " dimensions: ";
 		break;
 	}
-	
-	cout << "Function min: " << fRez << '\n';
+
+	cout << fRezMin << " " << fRezMed << " " << fRezMax << '\n';
 }
